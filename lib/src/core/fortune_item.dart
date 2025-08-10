@@ -12,6 +12,13 @@ class FortuneItem implements GestureHandler {
   /// A widget to be rendered within this item.
   final Widget child;
 
+  /// Optional relative weight of this item when used in widgets that support
+  /// weighted sizing (e.g., `FortuneWheel`). A larger value means a larger
+  /// portion of the wheel. Defaults to 1.0.
+  ///
+  /// Must be greater than 0.
+  final double weight;
+
   @override
   final GestureTapCallback? onDoubleTap;
 
@@ -153,6 +160,7 @@ class FortuneItem implements GestureHandler {
   const FortuneItem({
     this.style,
     required this.child,
+    this.weight = 1.0,
     this.onTap,
     this.onTapUp,
     this.onDoubleTap,
@@ -199,14 +207,17 @@ class FortuneItem implements GestureHandler {
     this.onVerticalDragEnd,
     this.onVerticalDragStart,
     this.onVerticalDragUpdate,
-  });
+  })  : assert(weight > 0, 'FortuneItem.weight must be > 0');
 
   @override
   int get hashCode => hash2(child, style);
 
   @override
   bool operator ==(Object other) {
-    return other is FortuneItem && style == other.style && child == other.child;
+    return other is FortuneItem &&
+        style == other.style &&
+        child == other.child &&
+        weight == other.weight;
   }
 }
 
@@ -215,12 +226,17 @@ class TransformedFortuneItem implements FortuneItem {
   final FortuneItem _item;
   final double angle;
   final Offset offset;
+  final double sliceAngle;
 
   const TransformedFortuneItem({
     required FortuneItem item,
     this.angle = 0.0,
     this.offset = Offset.zero,
+    this.sliceAngle = 0.0,
   }) : _item = item;
+
+  @override
+  double get weight => _item.weight;
 
   Widget get child => _item.child;
 

@@ -12,13 +12,56 @@ Offset _calculateWheelOffset(
   return Offset(offsetX, constraints.maxHeight / 2);
 }
 
-double _calculateSliceAngle(int index, int itemCount) {
-  final anglePerChild = 2 * _math.pi / itemCount;
-  final childAngle = anglePerChild * index;
-  // first slice starts at 90 degrees, if 0 degrees is at the top.
-  // The angle offset puts the center of the first slice at the top.
-  final angleOffset = -(_math.pi / 2 + anglePerChild / 2);
-  return childAngle + angleOffset;
+// kept for backwards reference in code history; not used anymore after weights
+
+class _WeightedSlicesGeometry {
+  final List<double> cumulativeCenters; // running center angles for each slice
+  final List<double> sweepAngles; // sweep for each slice
+  final List<double> cumulativeStarts; // start angle of each slice
+  final double totalWeight;
+
+  const _WeightedSlicesGeometry({
+    required this.cumulativeCenters,
+    required this.sweepAngles,
+    required this.cumulativeStarts,
+    required this.totalWeight,
+  });
+}
+
+_WeightedSlicesGeometry _computeWeightedSlices(List<FortuneItem> items) {
+  final weights = items.map((e) => e.weight).toList(growable: false);
+  final totalWeight = weights.fold<double>(0.0, (a, b) => a + b);
+  if (totalWeight == 0) {
+    final uniformSweep = 2 * _math.pi / items.length;
+    final starts = List<double>.generate(items.length, (i) => i * uniformSweep);
+    final centers =
+        List<double>.generate(items.length, (i) => starts[i] + uniformSweep / 2);
+    return _WeightedSlicesGeometry(
+      cumulativeCenters: centers,
+      sweepAngles: List<double>.filled(items.length, uniformSweep),
+      cumulativeStarts: starts,
+      totalWeight: items.length.toDouble(),
+    );
+  }
+
+  final sweeps = [
+    for (final w in weights) (w / totalWeight) * (2 * _math.pi),
+  ];
+  final starts = <double>[];
+  double acc = 0.0;
+  for (final s in sweeps) {
+    starts.add(acc);
+    acc += s;
+  }
+  final centers = [
+    for (var i = 0; i < sweeps.length; i++) starts[i] + sweeps[i] / 2,
+  ];
+  return _WeightedSlicesGeometry(
+    cumulativeCenters: centers,
+    sweepAngles: sweeps,
+    cumulativeStarts: starts,
+    totalWeight: totalWeight,
+  );
 }
 
 double _calculateAlignmentOffset(Alignment alignment) {
@@ -278,20 +321,25 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
 
                   final isAnimatingPanFactor =
                       rotateAnimCtrl.isAnimating ? 0 : 1;
-                  final selectedAngle =
-                      -2 * _math.pi * (selectedIndex.value / items.length);
+                  // Compute weighted geometry
+                  final geometry = _computeWeightedSlices(items);
+
+                  // Determine the absolute angle of the selected item's center.
+                  // Alignment offset is applied later during rendering.
+                  final selectedAngle = -geometry.cumulativeCenters[
+                      selectedIndex.value % items.length];
                   final panAngle =
                       panState.distance * panFactor * isAnimatingPanFactor;
                   final rotationAngle = _getAngle(rotateAnim.value);
                   final alignmentOffset = _calculateAlignmentOffset(alignment);
                   final totalAngle = selectedAngle + panAngle + rotationAngle;
 
-                  final focusedIndex = _borderCross(
+                  final focusedIndex = _weightedBorderCross(
                     totalAngle,
                     lastVibratedAngle,
-                    items.length,
+                    geometry,
                     hapticImpact,
-                    _animateArrow, // _tetikle fonksiyonunu burada geçiriyoruz
+                    _animateArrow,
                   );
                   if (focusedIndex != null) {
                     onFocusItemChanged?.call(focusedIndex % items.length);
@@ -303,8 +351,11 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                         item: items[i],
                         angle: totalAngle +
                             alignmentOffset +
-                            _calculateSliceAngle(i, items.length),
+                            (geometry.cumulativeStarts[i] +
+                                geometry.sweepAngles[i] / 2 -
+                                _math.pi / 2),
                         offset: wheelData.offset,
+                        sliceAngle: geometry.sweepAngles[i],
                       ),
                   ];
 
@@ -341,31 +392,55 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
   }
 
   /// * vibrate and animate arrow when cross border
-  int? _borderCross(
+  // Replaced by weighted variant
+
+  /// Weighted variant of border cross: determines when the spinning angle passes
+  /// the boundary between two weighted slices and reports the newly focused index
+  /// at the current [alignment]. Uses the precomputed [geometry].
+  int? _weightedBorderCross(
     double angle,
     ObjectRef<double> lastVibratedAngle,
-    int itemsNumber,
+    _WeightedSlicesGeometry geometry,
     HapticImpact hapticImpact,
     VoidCallback animateArrow,
   ) {
-    final step = 360 / itemsNumber;
-    final angleDegrees = (angle * 180 / _math.pi).abs() + step / 2;
-    if (step.isNaN ||
-        angleDegrees.isNaN ||
-        lastVibratedAngle.value.isNaN ||
-        lastVibratedAngle.value.isInfinite ||
-        angleDegrees.isInfinite ||
-        step == 0) {
-      return null;
+    // Map current absolute angle to [0, 2*pi)
+    double norm(double a) {
+      final twoPi = 2 * _math.pi;
+      a %= twoPi;
+      if (a < 0) a += twoPi;
+      return a;
     }
-    if (lastVibratedAngle.value ~/ step == angleDegrees ~/ step) {
-      return null;
+
+    final current = norm(-angle); // reverse sign: increasing angle spins CW
+    final last = lastVibratedAngle.value.isFinite
+        ? norm(-lastVibratedAngle.value)
+        : current;
+
+    // Find focused index by the center closest to current angle within its sweep
+    int focused(double a) {
+      final centers = geometry.cumulativeCenters;
+      final sweeps = geometry.sweepAngles;
+      for (var i = 0; i < centers.length; i++) {
+        final start = geometry.cumulativeStarts[i];
+        final end = start + sweeps[i];
+        final s = norm(start);
+        final e = norm(end);
+        final inside = s <= e ? (a >= s && a < e) : (a >= s || a < e);
+        if (inside) return i;
+      }
+      return 0;
     }
-    final index = angleDegrees ~/ step * angle.sign.toInt() * -1;
+
+    final prevIndex = focused(last);
+    final currIndex = focused(current);
+    if (prevIndex == currIndex) return null;
+
     final hapticFeedbackFunction;
     switch (hapticImpact) {
       case HapticImpact.none:
-        return index;
+        lastVibratedAngle.value = angle;
+        return currIndex;
       case HapticImpact.heavy:
         hapticFeedbackFunction = HapticFeedback.heavyImpact;
         break;
@@ -378,7 +453,7 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
     }
     hapticFeedbackFunction();
     animateArrow();
-    lastVibratedAngle.value = (angleDegrees ~/ step) * step;
-    return index;
+    lastVibratedAngle.value = angle;
+    return currIndex;
   }
 }
