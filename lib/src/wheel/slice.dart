@@ -123,13 +123,13 @@ class _CircleSliceLayout extends StatelessWidget {
                 child: slice,
               ),
               if (child != null)
-                LayoutId(
-                  id: _SliceSlot.child,
-                  child: Transform.rotate(
-                    angle: slice.angle / 2,
-                    child: child,
-                  ),
-                ),
+                 LayoutId(
+                   id: _SliceSlot.child,
+                   child: Transform.rotate(
+                     angle: slice.angle / 2,
+                     child: child,
+                   ),
+                 ),
             ],
           ),
         ),

@@ -44,14 +44,22 @@ _WeightedSlicesGeometry _computeWeightedSlices(List<FortuneItem> items) {
     );
   }
 
+  // Initial proportional sweeps
   final sweeps = [
     for (final w in weights) (w / totalWeight) * (2 * _math.pi),
   ];
-  // Ensure numerical stability: adjust last slice to close the circle exactly
+  // Ensure no slice collapses due to rounding; use a tiny epsilon.
+  const double epsilon = 1e-8;
+  for (var i = 0; i < sweeps.length; i++) {
+    if (!(sweeps[i].isFinite) || sweeps[i] <= 0) {
+      sweeps[i] = epsilon;
+    }
+  }
+  // Renormalize to sum to 2*pi exactly.
   final sumSweeps = sweeps.fold<double>(0.0, (a, b) => a + b);
-  final diff = 2 * _math.pi - sumSweeps;
-  if (sweeps.isNotEmpty) {
-    sweeps[sweeps.length - 1] = (sweeps.last + diff).clamp(0.0, 2 * _math.pi);
+  final scale = (2 * _math.pi) / sumSweeps;
+  for (var i = 0; i < sweeps.length; i++) {
+    sweeps[i] *= scale;
   }
   final starts = <double>[];
   double acc = 0.0;
@@ -330,9 +338,9 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                   // Compute weighted geometry
                   final geometry = _computeWeightedSlices(items);
 
-                  // Determine the absolute angle of the selected item's center.
+                  // Determine the absolute angle of the selected item's start.
                   // Alignment offset is applied later during rendering.
-                  final selectedAngle = -geometry.cumulativeCenters[
+                  final selectedAngle = -geometry.cumulativeStarts[
                       selectedIndex.value % items.length];
                   final panAngle =
                       panState.distance * panFactor * isAnimatingPanFactor;
@@ -357,7 +365,7 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                         item: items[i],
                         angle: totalAngle +
                             alignmentOffset +
-                            (geometry.cumulativeStarts[i] - _math.pi / 2),
+                            geometry.cumulativeStarts[i],
                         offset: wheelData.offset,
                         sliceAngle: geometry.sweepAngles[i],
                       ),
