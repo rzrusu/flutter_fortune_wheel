@@ -312,6 +312,9 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
 
     final lastVibratedAngle = useRef<double>(0);
 
+    // Precompute geometry once per build
+    final geometry = _computeWeightedSlices(items);
+
     return PanAwareBuilder(
       behavior: HitTestBehavior.translucent,
       physics: physics,
@@ -319,27 +322,46 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
       builder: (context, panState) {
         return Stack(
           children: [
-            AnimatedBuilder(
-              animation: rotateAnim,
-              builder: (context, _) {
-                final size = MediaQuery.of(context).size;
-                final meanSize = (size.width + size.height) / 2;
-                final panFactor = 6 / meanSize;
+            // Build a static wheel once; rotate the whole layer per frame.
+            LayoutBuilder(builder: (context, constraints) {
+              final wheelData = _WheelData(
+                constraints: constraints,
+                itemCount: items.length,
+                textDirection: Directionality.of(context),
+              );
 
-                return LayoutBuilder(builder: (context, constraints) {
-                  final wheelData = _WheelData(
-                    constraints: constraints,
-                    itemCount: items.length,
-                    textDirection: Directionality.of(context),
-                  );
+              // Static child: build slices with base angles only.
+              final baseItems = [
+                for (var i = 0; i < items.length; i++)
+                  TransformedFortuneItem(
+                    item: items[i],
+                    angle: geometry.cumulativeStarts[i],
+                    offset: Offset.zero,
+                    sliceAngle: geometry.sweepAngles[i],
+                  ),
+              ];
 
-                  final isAnimatingPanFactor =
-                      rotateAnimCtrl.isAnimating ? 0 : 1;
-                  // Compute weighted geometry
-                  final geometry = _computeWeightedSlices(items);
+              final staticWheel = RepaintBoundary(
+                child: SizedBox.expand(
+                  child: _CircleSlices(
+                    items: baseItems,
+                    wheelData: wheelData,
+                    styleStrategy: styleStrategy,
+                  ),
+                ),
+              );
+
+              return AnimatedBuilder(
+                animation: rotateAnim,
+                child: staticWheel,
+                builder: (context, child) {
+                  final size = MediaQuery.of(context).size;
+                  final meanSize = (size.width + size.height) / 2;
+                  final panFactor = 6 / meanSize;
+
+                  final isAnimatingPanFactor = rotateAnimCtrl.isAnimating ? 0 : 1;
 
                   // Determine the absolute angle of the selected item's start.
-                  // Alignment offset is applied later during rendering.
                   final selectedAngle = -geometry.cumulativeStarts[
                       selectedIndex.value % items.length];
                   final panAngle =
@@ -359,28 +381,18 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                     onFocusItemChanged?.call(focusedIndex % items.length);
                   }
 
-                  final transformedItems = [
-                    for (var i = 0; i < items.length; i++)
-                      TransformedFortuneItem(
-                        item: items[i],
-                        angle: totalAngle +
-                            alignmentOffset +
-                            geometry.cumulativeStarts[i],
-                        offset: wheelData.offset,
-                        sliceAngle: geometry.sweepAngles[i],
-                      ),
-                  ];
-
-                  return SizedBox.expand(
-                    child: _CircleSlices(
-                      items: transformedItems,
-                      wheelData: wheelData,
-                      styleStrategy: styleStrategy,
+                  // Translate to wheel center, then rotate around that pivot
+                  return Transform.translate(
+                    offset: wheelData.offset,
+                    child: Transform.rotate(
+                      alignment: Alignment.topLeft,
+                      angle: totalAngle + alignmentOffset,
+                      child: child,
                     ),
                   );
-                });
-              },
-            ),
+                },
+              );
+            }),
             for (var it in indicators)
               IgnorePointer(
                 child: Container(
@@ -429,23 +441,24 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
         ? norm(-lastVibratedAngle.value)
         : current;
 
-    // Find focused index by the center closest to current angle within its sweep
-    int focused(double a) {
-      final centers = geometry.cumulativeCenters;
-      final sweeps = geometry.sweepAngles;
-      for (var i = 0; i < centers.length; i++) {
-        final start = geometry.cumulativeStarts[i];
-        final end = start + sweeps[i];
-        final s = norm(start);
-        final e = norm(end);
-        final inside = s <= e ? (a >= s && a < e) : (a >= s || a < e);
-        if (inside) return i;
+    // O(log n) lookup of segment index containing angle using cumulative starts
+    int indexFor(double a) {
+      final starts = geometry.cumulativeStarts;
+      int lo = 0, hi = starts.length;
+      while (lo < hi) {
+        final mid = (lo + hi) >> 1;
+        if (starts[mid] <= a) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
       }
-      return 0;
+      final idx = lo - 1;
+      return idx >= 0 ? idx : starts.length - 1;
     }
 
-    final prevIndex = focused(last);
-    final currIndex = focused(current);
+    final prevIndex = indexFor(last);
+    final currIndex = indexFor(current);
     if (prevIndex == currIndex) return null;
 
     final hapticFeedbackFunction;
