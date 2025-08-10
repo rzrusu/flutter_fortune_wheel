@@ -47,6 +47,12 @@ _WeightedSlicesGeometry _computeWeightedSlices(List<FortuneItem> items) {
   final sweeps = [
     for (final w in weights) (w / totalWeight) * (2 * _math.pi),
   ];
+  // Ensure numerical stability: adjust last slice to close the circle exactly
+  final sumSweeps = sweeps.fold<double>(0.0, (a, b) => a + b);
+  final diff = 2 * _math.pi - sumSweeps;
+  if (sweeps.isNotEmpty) {
+    sweeps[sweeps.length - 1] = (sweeps.last + diff).clamp(0.0, 2 * _math.pi);
+  }
   final starts = <double>[];
   double acc = 0.0;
   for (final s in sweeps) {
@@ -351,9 +357,7 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                         item: items[i],
                         angle: totalAngle +
                             alignmentOffset +
-                            (geometry.cumulativeStarts[i] +
-                                geometry.sweepAngles[i] / 2 -
-                                _math.pi / 2),
+                            (geometry.cumulativeStarts[i] - _math.pi / 2),
                         offset: wheelData.offset,
                         sliceAngle: geometry.sweepAngles[i],
                       ),
