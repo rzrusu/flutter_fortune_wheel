@@ -361,8 +361,9 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
 
                   final isAnimatingPanFactor = rotateAnimCtrl.isAnimating ? 0 : 1;
 
-                  // Determine the absolute angle of the selected item's start.
-                  final selectedAngle = -geometry.cumulativeStarts[
+                  // Determine the absolute angle so that the selected item's CENTER
+                  // aligns with the indicator.
+                  final selectedAngle = -geometry.cumulativeCenters[
                       selectedIndex.value % items.length];
                   final panAngle =
                       panState.distance * panFactor * isAnimatingPanFactor;
@@ -371,7 +372,8 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                   final totalAngle = selectedAngle + panAngle + rotationAngle;
 
                   final focusedIndex = _weightedBorderCross(
-                    totalAngle,
+                    // Include alignment offset to detect focus at the actual indicator position
+                    totalAngle + alignmentOffset,
                     lastVibratedAngle,
                     geometry,
                     hapticImpact,
