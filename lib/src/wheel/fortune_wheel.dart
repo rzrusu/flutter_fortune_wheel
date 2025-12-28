@@ -304,6 +304,7 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
 
     final rotateAnimCtrl = useAnimationController(duration: duration);
     final rotateAnim = CurvedAnimation(parent: rotateAnimCtrl, curve: curve);
+    final random = useMemoized(() => _math.Random());
     Future<void> animate() async {
       if (rotateAnimCtrl.isAnimating) {
         return;
@@ -314,8 +315,17 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
       await Future.microtask(() => onAnimationEnd?.call());
     }
 
+    final landingOffsetFactor = useState<double>(0.0);
+
+    void randomizeLandingOffset() {
+      landingOffsetFactor.value = random.nextDouble() - 0.5;
+    }
+
     useEffect(() {
-      if (animateFirst) animate();
+      if (animateFirst) {
+        randomizeLandingOffset();
+        animate();
+      }
       return null;
     }, []);
 
@@ -324,6 +334,7 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
     useEffect(() {
       final subscription = selected.listen((event) {
         selectedIndex.value = event;
+        randomizeLandingOffset();
         animate();
       });
       return subscription.cancel;
@@ -372,10 +383,13 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
 
                   final isAnimatingPanFactor = rotateAnimCtrl.isAnimating ? 0 : 1;
 
-                  // Determine the absolute angle so that the selected item's CENTER
-                  // aligns with the indicator.
-                  final selectedAngle = -geometry.cumulativeCenters[
-                      selectedIndex.value % items.length];
+                  // Determine the absolute angle so that a random point in the
+                  // selected slice aligns with the indicator.
+                  final itemIndex = selectedIndex.value % items.length;
+                  final sliceOffset =
+                      geometry.sweepAngles[itemIndex] * landingOffsetFactor.value;
+                  final selectedAngle =
+                      -geometry.cumulativeCenters[itemIndex] - sliceOffset;
                   final panAngle =
                       panState.distance * panFactor * isAnimatingPanFactor;
                   final rotationAngle = _getAngle(rotateAnim.value);
