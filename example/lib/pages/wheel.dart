@@ -15,6 +15,7 @@ class FortuneWheelPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
+    final slices = Constants.weightedFortuneValues;
     final alignment = useState(Alignment.topCenter);
     final selected = useStreamController<int>();
     final selectedIndex = useStream(selected.stream, initialData: 0).data ?? 0;
@@ -27,7 +28,7 @@ class FortuneWheelPage extends HookWidget {
 
     void handleRoll() {
       selected.add(
-        roll(Constants.fortuneValues.length),
+        roll(slices.length),
       );
     }
 
@@ -37,30 +38,75 @@ class FortuneWheelPage extends HookWidget {
         child: Column(
           children: [
             alignmentSelector,
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             RollButtonWithPreview(
               selected: selectedIndex,
               items: Constants.fortuneValues,
               onPressed: isAnimating.value ? null : handleRoll,
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Expanded(
-              child: FortuneWheel(
-                alignment: alignment.value,
-                selected: selected.stream,
-                onAnimationStart: () => isAnimating.value = true,
-                onAnimationEnd: () => isAnimating.value = false,
-                onFling: handleRoll,
-                hapticImpact: HapticImpact.heavy,
-                indicators: [
-                  FortuneIndicator(
-                    alignment: alignment.value,
-                    child: TriangleIndicator(),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: FortuneWheel(
+                      alignment: alignment.value,
+                      selected: selected.stream,
+                      onAnimationStart: () => isAnimating.value = true,
+                      onAnimationEnd: () => isAnimating.value = false,
+                      onFling: handleRoll,
+                      hapticImpact: HapticImpact.heavy,
+                      indicators: [
+                        FortuneIndicator(
+                          alignment: alignment.value,
+                          child: TriangleIndicator(),
+                        ),
+                      ],
+                      items: [
+                        for (final slice in slices)
+                          FortuneItem(
+                            weight: slice.weight,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(slice.label),
+                                Text(
+                                  'Weight ${slice.weight.toStringAsFixed(1)}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                            onTap: () => print(slice.label),
+                          )
+                      ],
+                    ),
                   ),
-                ],
-                items: [
-                  for (var it in Constants.fortuneValues)
-                    FortuneItem(child: Text(it), onTap: () => print(it))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Larger weights create wider slices. Tap Roll or fling the wheel to verify the layout.',
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final slice in slices)
+                              Chip(
+                                label: Text(
+                                  '${slice.label} (${slice.weight.toStringAsFixed(1)}x)',
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

@@ -79,31 +79,40 @@ _WeightedSlicesGeometry _computeWeightedSlices(List<FortuneItem> items) {
 }
 
 double _calculateAlignmentOffset(Alignment alignment) {
-  if (alignment == Alignment.topRight) {
-    return _math.pi * 0.25;
+  // Wheel slices start at 3 o'clock (0 rad) and sweep clockwise.
+  if (alignment == Alignment.center) {
+    return 0;
   }
 
   if (alignment == Alignment.centerRight) {
-    return _math.pi * 0.5;
+    return 0;
   }
 
   if (alignment == Alignment.bottomRight) {
-    return _math.pi * 0.75;
+    return _math.pi * 0.25;
   }
 
   if (alignment == Alignment.bottomCenter) {
-    return _math.pi;
+    return _math.pi * 0.5;
   }
 
   if (alignment == Alignment.bottomLeft) {
-    return _math.pi * 1.25;
+    return _math.pi * 0.75;
   }
 
   if (alignment == Alignment.centerLeft) {
-    return _math.pi * 1.5;
+    return _math.pi;
   }
 
   if (alignment == Alignment.topLeft) {
+    return _math.pi * 1.25;
+  }
+
+  if (alignment == Alignment.topCenter) {
+    return _math.pi * 1.5;
+  }
+
+  if (alignment == Alignment.topRight) {
     return _math.pi * 1.75;
   }
 

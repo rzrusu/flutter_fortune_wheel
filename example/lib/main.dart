@@ -35,16 +35,7 @@ class _ExamplePageState extends State<ExamplePage> {
 
   @override
   Widget build(BuildContext context) {
-    final items = <String>[
-      'Grogu',
-      'Mace Windu',
-      'Obi-Wan Kenobi',
-      'Han Solo',
-      'Luke Skywalker',
-      'Darth Vader',
-      'Yoda',
-      'Ahsoka Tano',
-    ];
+    final slices = Constants.weightedFortuneValues;
 
     return Scaffold(
       appBar: AppBar(
@@ -54,7 +45,7 @@ class _ExamplePageState extends State<ExamplePage> {
         onTap: () {
           setState(() {
             selected.add(
-              Fortune.randomInt(0, items.length),
+              Fortune.randomInt(0, slices.length),
             );
           });
         },
@@ -64,7 +55,46 @@ class _ExamplePageState extends State<ExamplePage> {
               child: FortuneWheel(
                 selected: selected.stream,
                 items: [
-                  for (var it in items) FortuneItem(child: Text(it)),
+                  for (final slice in slices)
+                    FortuneItem(
+                      weight: slice.weight,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(slice.label),
+                          Text(
+                            'Weight ${slice.weight.toStringAsFixed(1)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Tap anywhere to spin. Larger weights create wider slices.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final slice in slices)
+                        Chip(
+                          label: Text(
+                            '${slice.label} (${slice.weight.toStringAsFixed(1)}x)',
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
