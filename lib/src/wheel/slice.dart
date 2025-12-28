@@ -53,12 +53,14 @@ class _CircleSliceLayout extends StatelessWidget {
   final Widget? child;
   final _CircleSlice slice;
   final GestureHandler? handler;
+  final double textRotation;
 
   const _CircleSliceLayout({
     Key? key,
     required this.slice,
     this.child,
     this.handler,
+    this.textRotation = 0.0,
   }) : super(key: key);
 
   @override
@@ -126,7 +128,7 @@ class _CircleSliceLayout extends StatelessWidget {
                  LayoutId(
                    id: _SliceSlot.child,
                    child: Transform.rotate(
-                     angle: slice.angle / 2,
+                     angle: slice.angle / 2 + textRotation,
                      child: child,
                    ),
                  ),

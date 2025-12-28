@@ -207,6 +207,12 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
   /// Defaults to [Alignment.topCenter]
   final Alignment alignment;
 
+  /// Whether to mirror slice text on the opposite side of the spin direction.
+  ///
+  /// This keeps text readable on both sides of the wheel.
+  /// Defaults to true.
+  final bool mirrorTextOnOppositeSide;
+
   /// HapticFeedback strength on each section border crossing.
   ///
   /// Defaults to [HapticImpact.none]
@@ -242,6 +248,7 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
     this.onAnimationStart,
     this.onAnimationEnd,
     this.alignment = Alignment.topCenter,
+    this.mirrorTextOnOppositeSide = true,
     this.hapticImpact = HapticImpact.none,
     PanPhysics? physics,
     this.onFling,
@@ -331,7 +338,7 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
       builder: (context, panState) {
         return Stack(
           children: [
-            // Build a static wheel once; rotate the whole layer per frame.
+            // Build wheel slices with base angles; rotate the whole layer per frame.
             LayoutBuilder(builder: (context, constraints) {
               final wheelData = _WheelData(
                 constraints: constraints,
@@ -339,7 +346,7 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                 textDirection: Directionality.of(context),
               );
 
-              // Static child: build slices with base angles only.
+              // Build slices with base angles only.
               final baseItems = [
                 for (var i = 0; i < items.length; i++)
                   TransformedFortuneItem(
@@ -350,20 +357,9 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                   ),
               ];
 
-              final staticWheel = RepaintBoundary(
-                child: SizedBox.expand(
-                  child: _CircleSlices(
-                    items: baseItems,
-                    wheelData: wheelData,
-                    styleStrategy: styleStrategy,
-                  ),
-                ),
-              );
-
               return AnimatedBuilder(
                 animation: rotateAnim,
-                child: staticWheel,
-                builder: (context, child) {
+                builder: (context, _) {
                   final size = MediaQuery.of(context).size;
                   final meanSize = (size.width + size.height) / 2;
                   final panFactor = 6 / meanSize;
@@ -379,10 +375,11 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                   final rotationAngle = _getAngle(rotateAnim.value);
                   final alignmentOffset = _calculateAlignmentOffset(alignment);
                   final totalAngle = selectedAngle + panAngle + rotationAngle;
+                  final wheelRotation = totalAngle + alignmentOffset;
 
                   final focusedIndex = _weightedBorderCross(
                     // Include alignment offset to detect focus at the actual indicator position
-                    totalAngle + alignmentOffset,
+                    wheelRotation,
                     lastVibratedAngle,
                     geometry,
                     hapticImpact,
@@ -392,13 +389,25 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                     onFocusItemChanged?.call(focusedIndex % items.length);
                   }
 
+                  final wheel = RepaintBoundary(
+                    child: SizedBox.expand(
+                      child: _CircleSlices(
+                        items: baseItems,
+                        wheelData: wheelData,
+                        styleStrategy: styleStrategy,
+                        rotationAngle: wheelRotation,
+                        mirrorTextOnOppositeSide: mirrorTextOnOppositeSide,
+                      ),
+                    ),
+                  );
+
                   // Translate to wheel center, then rotate around that pivot
                   return Transform.translate(
                     offset: wheelData.offset,
                     child: Transform.rotate(
                       alignment: Alignment.topLeft,
-                      angle: totalAngle + alignmentOffset,
-                      child: child,
+                      angle: wheelRotation,
+                      child: wheel,
                     ),
                   );
                 },
