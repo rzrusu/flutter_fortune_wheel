@@ -19,6 +19,7 @@ class _TransformedCircleSlice extends StatelessWidget {
   final int index;
   final double rotationAngle;
   final bool mirrorTextOnOppositeSide;
+  final bool animateTextRotation;
 
   const _TransformedCircleSlice({
     Key? key,
@@ -28,6 +29,7 @@ class _TransformedCircleSlice extends StatelessWidget {
     required this.wheelData,
     required this.rotationAngle,
     required this.mirrorTextOnOppositeSide,
+    required this.animateTextRotation,
   }) : super(key: key);
 
   @override
@@ -49,6 +51,7 @@ class _TransformedCircleSlice extends StatelessWidget {
     return _CircleSliceLayout(
       handler: item,
       textRotation: textRotation,
+      animateTextRotation: animateTextRotation,
       child: DefaultTextStyle(
         textAlign: style.textAlign,
         style: style.textStyle,
@@ -71,6 +74,7 @@ class _CircleSlices extends StatelessWidget {
   final _WheelData wheelData;
   final double rotationAngle;
   final bool mirrorTextOnOppositeSide;
+  final bool animateTextRotation;
 
   const _CircleSlices({
     Key? key,
@@ -79,6 +83,7 @@ class _CircleSlices extends StatelessWidget {
     required this.wheelData,
     required this.rotationAngle,
     required this.mirrorTextOnOppositeSide,
+    required this.animateTextRotation,
   }) : super(key: key);
 
   @override
@@ -97,6 +102,7 @@ class _CircleSlices extends StatelessWidget {
               wheelData: wheelData,
               rotationAngle: rotationAngle,
               mirrorTextOnOppositeSide: mirrorTextOnOppositeSide,
+              animateTextRotation: animateTextRotation,
             ),
           ),
         ),

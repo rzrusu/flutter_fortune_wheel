@@ -2,6 +2,9 @@ part of 'wheel.dart';
 
 enum HapticImpact { none, light, medium, heavy }
 
+// Only mirror text when the wheel is slow enough to read.
+const double _kTextMirrorMaxAngularVelocity = 4.0;
+
 Offset _calculateWheelOffset(
     BoxConstraints constraints, TextDirection textDirection) {
   final smallerSide = getSmallerSide(constraints);
@@ -330,6 +333,9 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
 
     // Precompute geometry once per build
     final geometry = _computeWeightedSlices(items);
+    final lastRotationAngle = useRef<double?>(null);
+    final lastRotationTimestamp = useRef<int?>(null);
+    final lastAngularVelocity = useRef<double>(0.0);
 
     return PanAwareBuilder(
       behavior: HitTestBehavior.translucent,
@@ -376,6 +382,23 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                   final alignmentOffset = _calculateAlignmentOffset(alignment);
                   final totalAngle = selectedAngle + panAngle + rotationAngle;
                   final wheelRotation = totalAngle + alignmentOffset;
+                  final now = DateTime.now().microsecondsSinceEpoch;
+                  final lastTimestamp = lastRotationTimestamp.value;
+                  final lastAngle = lastRotationAngle.value;
+                  var angularVelocity = lastAngularVelocity.value;
+                  if (lastTimestamp != null && lastAngle != null) {
+                    final deltaTime = (now - lastTimestamp) /
+                        Duration.microsecondsPerSecond;
+                    if (deltaTime > 0) {
+                      angularVelocity =
+                          ((wheelRotation - lastAngle) / deltaTime).abs();
+                    }
+                  }
+                  lastRotationTimestamp.value = now;
+                  lastRotationAngle.value = wheelRotation;
+                  lastAngularVelocity.value = angularVelocity;
+                  final allowTextMirror = mirrorTextOnOppositeSide &&
+                      angularVelocity <= _kTextMirrorMaxAngularVelocity;
 
                   final focusedIndex = _weightedBorderCross(
                     // Include alignment offset to detect focus at the actual indicator position
@@ -396,7 +419,8 @@ class FortuneWheel extends HookWidget implements FortuneWidget {
                         wheelData: wheelData,
                         styleStrategy: styleStrategy,
                         rotationAngle: wheelRotation,
-                        mirrorTextOnOppositeSide: mirrorTextOnOppositeSide,
+                        mirrorTextOnOppositeSide: allowTextMirror,
+                        animateTextRotation: allowTextMirror,
                       ),
                     ),
                   );

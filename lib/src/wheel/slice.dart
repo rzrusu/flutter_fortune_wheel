@@ -54,6 +54,7 @@ class _CircleSliceLayout extends StatelessWidget {
   final _CircleSlice slice;
   final GestureHandler? handler;
   final double textRotation;
+  final bool animateTextRotation;
 
   const _CircleSliceLayout({
     Key? key,
@@ -61,6 +62,7 @@ class _CircleSliceLayout extends StatelessWidget {
     this.child,
     this.handler,
     this.textRotation = 0.0,
+    this.animateTextRotation = true,
   }) : super(key: key);
 
   @override
@@ -128,8 +130,28 @@ class _CircleSliceLayout extends StatelessWidget {
                  LayoutId(
                    id: _SliceSlot.child,
                    child: Transform.rotate(
-                     angle: slice.angle / 2 + textRotation,
-                     child: child,
+                     angle: slice.angle / 2,
+                     child: animateTextRotation
+                         ? AnimatedSwitcher(
+                             duration: const Duration(milliseconds: 60),
+                             switchInCurve: Curves.linear,
+                             switchOutCurve: Curves.linear,
+                             transitionBuilder: (child, animation) {
+                               return FadeTransition(
+                                 opacity: animation,
+                                 child: child,
+                               );
+                             },
+                             child: Transform.rotate(
+                               key: ValueKey<double>(textRotation),
+                               angle: textRotation,
+                               child: child,
+                             ),
+                           )
+                         : Transform.rotate(
+                             angle: textRotation,
+                             child: child,
+                           ),
                    ),
                  ),
             ],
